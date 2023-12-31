@@ -1,6 +1,8 @@
 const std = @import("std");
 const gpio = @import("gpio.zig");
 
+pub const regs = @import("STM32G030.zig").devices.STM32G030.peripherals;
+
 const GPIOA = gpio.GPIOA;
 const GPIOB = gpio.GPIOB;
 const GPIOC = gpio.GPIOC;
@@ -34,9 +36,9 @@ pub const startup_pin_config = .{
     Cfg{ .name = pins.row2, .mode = .output, .level = .low },
     Cfg{ .name = pins.row3, .mode = .output, .level = .low },
     Cfg{ .name = pins.row4, .mode = .output, .level = .low },
-    Cfg{ .name = pins.col1, .mode = .input, .pull = .up },
-    Cfg{ .name = pins.col2, .mode = .input, .pull = .up },
-    Cfg{ .name = pins.col3, .mode = .input, .pull = .up },
+    Cfg{ .name = pins.col1, .mode = .input, .pull = .up, .output_type = .open_drain },
+    Cfg{ .name = pins.col2, .mode = .input, .pull = .up, .output_type = .open_drain },
+    Cfg{ .name = pins.col3, .mode = .input, .pull = .up, .output_type = .open_drain },
 
     Cfg{ .name = pins.ir_in_enable, .mode = .output, .level = .low },
     Cfg{ .name = pins.ir_in, .mode = .analog },
@@ -55,10 +57,11 @@ pub const cols_as_input = .{
     Cfg{ .name = pins.col2, .mode = .input, .pull = .up },
     Cfg{ .name = pins.col3, .mode = .input, .pull = .up },
 };
-pub const cols_as_output = .{
-    Cfg{ .name = pins.col1, .mode = .output, .output_type = .open_drain, .pull = .none, .level = .low },
-    Cfg{ .name = pins.col2, .mode = .output, .output_type = .open_drain, .pull = .none, .level = .low },
-    Cfg{ .name = pins.col3, .mode = .output, .output_type = .open_drain, .pull = .none, .level = .low },
+
+pub const cols_as_opendrain_highz = .{
+    Cfg{ .name = pins.col1, .mode = .output, .pull = .none, .level = .high },
+    Cfg{ .name = pins.col2, .mode = .output, .pull = .none, .level = .high },
+    Cfg{ .name = pins.col3, .mode = .output, .pull = .none, .level = .high },
 };
 
 pub const rows_low = .{

@@ -1,6 +1,6 @@
 const rtt = @import("rtt.zig");
 const std = @import("std");
-const regs = @import("STM32G030.zig").devices.STM32G030.peripherals;
+const regs = @import("board.zig").regs;
 
 pub const GPIO_Type = @TypeOf(regs.GPIOA);
 pub const GPIOA: GPIO_Type = @ptrCast(regs.GPIOA);

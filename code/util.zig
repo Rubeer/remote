@@ -1,5 +1,5 @@
-const regs = @import("STM32G030.zig").devices.STM32G030.peripherals;
 const std = @import("std");
+const regs = @import("board.zig").regs;
 
 pub fn wfi() void {
     asm volatile ("wfi");
@@ -7,7 +7,7 @@ pub fn wfi() void {
 pub fn nop() void {
     asm volatile ("nop");
 }
-pub fn nops(count: u32) void {
+pub noinline fn nops(count: u32) void {
     for (0..count) |_|
         asm volatile ("nop");
 }

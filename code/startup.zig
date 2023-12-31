@@ -1,13 +1,12 @@
 const std = @import("std");
-const svd = @import("STM32G030.zig");
 const rtt = @import("rtt.zig");
 const util = @import("util.zig");
 const gpio = @import("gpio.zig");
 const hw = @import("hw.zig");
-const board = @import("board.zig");
 const ir = @import("ir.zig");
 const keys = @import("keymatrix.zig");
 
+const svd = @import("STM32G030.zig");
 const regs = svd.devices.STM32G030.peripherals;
 
 extern const _data_start_in_flash: u8;
@@ -40,6 +39,14 @@ export fn Reset_Handler() callconv(.C) noreturn {
     hw.init_peripherals();
     //ir.transmit(&ir.panasonic_tv_power_toggle);
 
+    //rtt.println("Hello", .{});
+    rtt.print_unformatted("Hello\n");
+
+    keys.schedule_next_interrupt(10000);
+
+    keys.matrix[2][2].brightness = 0.1;
+    keys.led_setup();
+
     var encoder_count: i16 = 0;
     while (true) {
         const new_encoder = hw.read_encoder();
@@ -49,7 +56,9 @@ export fn Reset_Handler() callconv(.C) noreturn {
             rtt.println("{}", .{new_encoder});
         }
 
-        keys.scanout();
+        util.wfi();
+
+        //keys.scanout();
     }
 }
 
@@ -68,4 +77,5 @@ export const vector_table linksection(".vector_table") = svd.devices.STM32G030.V
     .Reset = Reset_Handler,
     .HardFault = HardFault_Handler,
     .DMA_Channel1 = ir.DMA_Channel1_IRQHandler,
+    .TIM14 = keys.TIM14_IRQHandler,
 };

@@ -55,13 +55,18 @@ pub fn Mmio(comptime PackedT: type) type {
             write(addr, val);
         }
 
-        pub inline fn zero_init(addr: Self) PackedT {
-            _ = addr;
-            return std.mem.zeroes(PackedT);
-        }
-
+        /// For write-only register where writing 0 does not do anything (e.g. write 1 to clear the flag, write 0 to leave it be)
         pub inline fn set_others_zero(addr: *volatile Self, fields: anytype) void {
             var reg = std.mem.zeroes(PackedT);
+            inline for (@typeInfo(@TypeOf(fields)).Struct.fields) |field| {
+                @field(reg, field.name) = @field(fields, field.name);
+            }
+            write(addr, reg);
+        }
+
+        /// For write-only register where writing 1 does not do anything (e.g. write 0 to clear the flag, write 1 to leave it be)
+        pub inline fn set_others_one(addr: *volatile Self, fields: anytype) void {
+            var reg: PackedT = @bitCast(@as(IntT, std.math.maxInt(IntT)));
             inline for (@typeInfo(@TypeOf(fields)).Struct.fields) |field| {
                 @field(reg, field.name) = @field(fields, field.name);
             }

@@ -53,7 +53,8 @@ pub fn transmit(cmd: *const IRCommand) void {
     TIM16.CNT.write_raw(0);
     TIM16.CCER.modify(.{ .CC1E = 1 }); // Enable CC channel 1
 
-    // Force the output level to begin active
+    // Force the output level to begin at inactive level
+    // (It may be in another state due to previous toggles)
     var reg = TIM16.CCMR1_Output.read();
     reg.OC1M = .forced_inactive;
     TIM16.CCMR1_Output.write(reg);
@@ -64,6 +65,7 @@ pub fn transmit(cmd: *const IRCommand) void {
     TIM16.DIER.modify(.{ .CC1DE = 1 }); // Enable DMA request on CC channel 1
 
     // Switches the output pin from output mode to alternate mode.
+    // (i.e. connects the pin to the timer output)
     gpio.configure(board.ir_output_on);
 
     // Enable counters

@@ -1,23 +1,6 @@
 const mmio = @import("mmio.zig");
 const startup = @import("startup.zig");
 
-/// Work around limitation in regz
-pub const CCMR1_Input = packed struct(u32) {
-    ///  Capture/Compare 1 selection
-    CC1S: u2,
-    /// Input capture 1 prescaler
-    IC1PSC: u2,
-    /// Input capture 1 filter
-    IC1F: u4,
-    /// Capture/compare 2 selection
-    CC2S: u2,
-    /// Input capture 2 prescaler
-    IC2PSC: u2,
-    /// Input capture 2 filter
-    IC2F: u4,
-    padding: u16 = 0,
-};
-
 pub const devices = struct {
     ///  STM32G030
     pub const STM32G030 = struct {
@@ -103,6 +86,23 @@ pub const devices = struct {
         };
 
         pub const peripherals = struct {
+            /// Work around limitation in regz
+            pub const CCMR1_Input = packed struct(u32) {
+                ///  Capture/Compare 1 selection
+                CC1S: u2,
+                /// Input capture 1 prescaler
+                IC1PSC: u2,
+                /// Input capture 1 filter
+                IC1F: u4,
+                /// Capture/compare 2 selection
+                CC2S: u2,
+                /// Input capture 2 prescaler
+                IC2PSC: u2,
+                /// Input capture 2 filter
+                IC2F: u4,
+                padding: u16 = 0,
+            };
+
             ///  General-purpose-timers
             pub const TIM2: *volatile types.peripherals.TIM2 = @ptrFromInt(0x40000000);
             ///  General-purpose-timers

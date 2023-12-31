@@ -1,11 +1,11 @@
-const svd = @import("STM32G030.zig");
 const gpio = @import("gpio.zig");
 const board = @import("board.zig");
 const util = @import("util.zig");
 
-const regs = svd.devices.STM32G030.peripherals;
+const regs = board.regs;
 const RCC = regs.RCC;
 const TIM3 = regs.TIM3;
+const TIM14 = regs.TIM14;
 const TIM16 = regs.TIM16;
 const TIM17 = regs.TIM17;
 const DMA = regs.DMA;
@@ -30,18 +30,13 @@ pub fn init_peripherals() void {
 
     RCC.APBENR2.modify(.{
         .SYSCFGEN = 1,
+        .TIM14EN = 1,
         .TIM16EN = 1,
         .TIM17EN = 1,
     });
 
     RCC.AHBENR.modify(.{
         .DMAEN = 1,
-    });
-
-    util.enable_irqs(&.{
-        IRQs.DMA1_Channel1,
-        IRQs.DMA1_Channel2_3,
-        IRQs.TIM16,
     });
 
     // Enable GPIO Clocks
@@ -51,25 +46,31 @@ pub fn init_peripherals() void {
         .IOPCEN = 1,
     });
 
+    util.enable_irqs(&.{
+        IRQs.DMA1_Channel1,
+        IRQs.DMA1_Channel2_3,
+        IRQs.TIM16,
+        IRQs.TIM14,
+    });
+
     gpio.configure(board.startup_pin_config);
 
     init_encoder();
     init_ir_transmitter();
+    init_led_timer();
 }
 
 pub fn read_encoder() i16 {
-    return @as(i16, @bitCast(regs.TIM3.CNT.read().CNT_L));
+    return @as(i16, @bitCast(TIM3.CNT.read().CNT_L));
 }
 
 fn init_encoder() void {
     TIM3.ARR.write_raw(0xFFFF); // Maxed out counter limit
 
-    TIM3.SMCR.modify(.{
-        .SMS = 1, // Encoder mode 1
-    });
+    TIM3.SMCR.modify(.{ .SMS = 1 }); // Encoder mode 1
 
     // NOTE(robin): Work around limitation in regz
-    TIM3.CCMR1_Output.write_raw(@bitCast(svd.CCMR1_Input{
+    TIM3.CCMR1_Output.write_raw(@bitCast(regs.CCMR1_Input{
         .CC1S = 1, // Input TI1,
         .IC1PSC = 0,
         .IC1F = 0b1111, // Strongest filter
@@ -92,7 +93,7 @@ fn init_encoder() void {
 }
 
 fn init_ir_transmitter() void {
-    DMAMUX.C0CR.modify(.{ .DMAREQ_ID = 44 }); // TIM16_CH1
+    DMAMUX.C0CR.modify(.{ .DMAREQ_ID = 44 }); // 44 = TIM16_CH1
 
     DMA.CCR1.modify(.{
         .EN = 0,
@@ -112,7 +113,10 @@ fn init_ir_transmitter() void {
 
     TIM16.ARR.write_raw(10000);
     TIM16.PSC.write_raw(15);
-    TIM16.CCMR1_Output.modify(.{ .OC1M = .forced_inactive, .OC1M_2 = 0 }); // Set output to forced inactive
+    TIM16.CCMR1_Output.modify(.{
+        .OC1M = .forced_inactive,
+        .OC1M_2 = 0,
+    });
     TIM16.CR2.modify(.{ .CCDS = 0 }); // DMA request to CC mode
 
     // Enable outputs
@@ -131,4 +135,10 @@ fn init_ir_transmitter() void {
         .IR_POL = 1,
         .IR_MOD = 0, // TIM16
     });
+}
+
+fn init_led_timer() void {
+    TIM14.PSC.write_raw(15); // 1 us resolution
+    TIM14.CR1.modify(.{ .OPM = 1 }); // One pulse mode
+    TIM14.DIER.modify(.{ .UIE = 1 }); // Enable update interrupt
 }

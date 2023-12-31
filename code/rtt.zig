@@ -27,25 +27,27 @@ const atomic = std.atomic;
 const debug = std.debug;
 const fmt = std.fmt;
 
+const print_writer = Writer{ .chan = &_SEGGER_RTT.channel };
+
 /// Print something to the RTT channel.
 ///
 /// Uses the `std.fmt` plumbing under the hood.
 pub fn print(comptime fmt_str: []const u8, args: anytype) void {
-    _SEGGER_RTT.channel.print(fmt_str, args);
+    fmt.format(print_writer, fmt_str, args) catch unreachable;
 }
 
 /// Print something to the RTT channel, with a newline.
 ///
 /// Uses the `std.fmt` plumbing under the hood.
 pub fn println(comptime fmt_str: []const u8, args: anytype) void {
-    _SEGGER_RTT.channel.print(fmt_str ++ "\n", args);
+    fmt.format(print_writer, fmt_str ++ "\n", args) catch unreachable;
 }
 
 /// Write raw bytes directly to the RTT channel.
 ///
 /// Does _not_ use the `std.fmt` plumbing.
-pub fn writeAll(bytes: []const u8) void {
-    _SEGGER_RTT.channel.writeAll(bytes);
+pub fn print_unformatted(bytes: []const u8) void {
+    print_writer.writeAll(bytes) catch unreachable;
 }
 
 const RTT_MODE_TRUNC = 1;
@@ -82,20 +84,6 @@ const Channel = extern struct {
     write: usize,
     read: usize,
     flags: usize,
-
-    fn print(
-        self: *Channel,
-        comptime fmt_str: []const u8,
-        args: anytype,
-    ) void {
-        const writer = Writer{ .chan = self };
-        fmt.format(writer, fmt_str, args) catch unreachable;
-    }
-
-    fn writeAll(self: *Channel, bytes: []const u8) void {
-        const writer = Writer{ .chan = self };
-        writer.writeAll(bytes) catch unreachable;
-    }
 };
 
 const Writer = struct {
@@ -103,7 +91,7 @@ const Writer = struct {
 
     pub const Error = error{}; // infallible
 
-    pub fn writeAll(self: Writer, bytes: []const u8) Writer.Error!void {
+    pub noinline fn writeAll(self: Writer, bytes: []const u8) Writer.Error!void {
         var xs = bytes;
 
         while (xs.len != 0) {
@@ -114,13 +102,12 @@ const Writer = struct {
             const n = @min(xs.len, avail);
             if (n == 0) {
                 // todo: add non-blocking impl with truncated writes
-                debug.assert(readVolatile(&self.chan.flags) == RTT_MODE_BLOCK);
+                //debug.assert(readVolatile(&self.chan.flags) == RTT_MODE_BLOCK);
                 continue;
             }
 
             @memcpy(self.chan.buf[write .. write + n], xs[0..n]);
             xs = xs[n..];
-            asm volatile ("" ::: "memory");
             writeVolatile(&self.chan.write, (write + n) % BUF_LEN);
         }
     }
