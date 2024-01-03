@@ -36,7 +36,7 @@ fn volume_animation_update(dt: f32, animation: *Animation) void {
         const pos: f32 = @floatFromInt(i);
         const x = @abs(pos - quarter);
         l.brightness = 1.5 - x;
-        if (l.brightness > 1.0) l.brightness = 1.0;
+        l.brightness = std.math.clamp(l.brightness, 0, 1);
     }
 
     switch (animation.volume.dir) {
