@@ -15,6 +15,17 @@ const ports = [_]GPIO_Type{
     GPIOD,
 };
 
+pub fn get_port(num: u2) GPIO_Type {
+    if (false) {
+        return ports[num];
+    } else {
+        const base = @intFromPtr(GPIOA);
+        const offset = @intFromPtr(GPIOB) - @intFromPtr(GPIOA);
+        if (offset != 0x400) @compileError("Unexpected GPIO offset");
+        return @ptrFromInt(base + (@as(u32, num) * offset));
+    }
+}
+
 pub const Mode = enum(u2) {
     input = 0b00,
     output = 0b01,
@@ -64,10 +75,19 @@ pub const Pin = struct {
     pin: u4,
 
     pub inline fn set_high(self: Pin) void {
-        ports[self.port].BSRR.write_raw(@as(u32, 1) << self.pin);
+        get_port(self.port).BSRR.write_raw(@as(u32, 1) << self.pin);
+    }
+    pub inline fn set_mode(self: Pin, mode: Mode) void {
+        const shift = 2 * @as(u5, self.pin);
+        const mask = ~(@as(u32, 0b11) << shift);
+        const bits = @as(u32, @intFromEnum(mode)) << shift;
+        var moder = get_port(self.port).MODER.read_raw();
+        moder &= mask;
+        moder |= bits;
+        get_port(self.port).MODER.write_raw(moder);
     }
     pub inline fn set_low(self: Pin) void {
-        ports[self.port].BSRR.write_raw((@as(u32, 1) << self.pin) << 16);
+        get_port(self.port).BRR.write_raw((@as(u32, 1) << self.pin));
     }
 };
 
@@ -150,11 +170,10 @@ pub fn configure(comptime config: anytype) void {
         if (level[i].mask != 0) {
             const set_bits = level[i].bits;
             const reset_bits = level[i].bits ^ level[i].mask;
-            if (set_bits != 0) {
-                port.BSRR.write_raw(set_bits);
-            }
-            if (reset_bits != 0) {
-                port.BSRR.write_raw(reset_bits << 16);
+            const combined = set_bits | (reset_bits << 16);
+
+            if (combined != 0) {
+                port.BSRR.write_raw(combined);
             }
         }
 

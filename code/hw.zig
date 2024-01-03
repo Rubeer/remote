@@ -1,9 +1,11 @@
+const std = @import("std");
 const gpio = @import("gpio.zig");
 const board = @import("board.zig");
 const util = @import("util.zig");
 
 const regs = board.regs;
 const RCC = regs.RCC;
+const TIM1 = regs.TIM1;
 const TIM3 = regs.TIM3;
 const TIM14 = regs.TIM14;
 const TIM16 = regs.TIM16;
@@ -14,6 +16,16 @@ const DMAMUX = regs.DMAMUX;
 const IRQs = util.IRQs;
 
 pub const clock_rate = 16000000;
+const systick_interval_ms = 10;
+
+var ticks_ms: u32 = 0;
+pub fn SysTick_Handler() callconv(.C) void {
+    ticks_ms +%= systick_interval_ms;
+}
+
+pub fn get_ticks() u32 {
+    return util.read_once(u32, &ticks_ms);
+}
 
 pub fn init_clock() void {
     // HSI is already enabled startup at 16 MHz.
@@ -30,6 +42,7 @@ pub fn init_peripherals() void {
 
     RCC.APBENR2.modify(.{
         .SYSCFGEN = 1,
+        .TIM1EN = 1,
         .TIM14EN = 1,
         .TIM16EN = 1,
         .TIM17EN = 1,
@@ -58,10 +71,19 @@ pub fn init_peripherals() void {
     init_encoder();
     init_ir_transmitter();
     init_led_timer();
+    init_ir_receiver();
+
+    // Enable SysTick 10ms interval
+    regs.STK.RVR.write_raw((clock_rate * systick_interval_ms) / 1000);
+    regs.STK.CSR.modify(.{
+        .ENABLE = 1,
+        .CLKSOURCE = 1,
+        .TICKINT = 1,
+    });
 }
 
 pub fn read_encoder() i16 {
-    return @as(i16, @bitCast(TIM3.CNT.read().CNT_L));
+    return -(@as(i16, @bitCast(TIM3.CNT.read().CNT_L)) >> 1);
 }
 
 fn init_encoder() void {
@@ -102,14 +124,14 @@ fn init_ir_transmitter() void {
         .MINC = 1, // enable memory data address increment
         .MSIZE = 1, // 16 bit
 
-        .PINC = 0, // disable periph data address increment
+        .PINC = 0, // disable peripheral data address increment
         .PSIZE = 1, // 16 bit
+
+        .TCIE = 1, // Enable transfer complete interrupt
     });
 
     DMA.CPAR1.write_raw(@intFromPtr(&TIM16.ARR));
     // CMAR1 is set in transmit function
-
-    DMA.CCR1.modify(.{ .TCIE = 1 }); // Enable transfer complete interrupt
 
     TIM16.ARR.write_raw(10000);
     TIM16.PSC.write_raw(15);
@@ -135,6 +157,35 @@ fn init_ir_transmitter() void {
         .IR_POL = 1,
         .IR_MOD = 0, // TIM16
     });
+}
+
+fn init_ir_receiver() void {
+    DMAMUX.C1CR.modify(.{ .DMAREQ_ID = 20 }); // 20 = TIM1_CH1
+
+    DMA.CCR2.modify(.{
+        .EN = 0,
+        .DIR = 0, // Peripheral to memory
+
+        .CIRC = 1, // Enable circular mode
+
+        .MINC = 1, // enable memory data address increment
+        .MSIZE = 1, // 16 bit
+
+        .PINC = 0, // disable peripheral data address increment
+        .PSIZE = 1, // 16 bit
+
+        .TCIE = 1, // Enable transfer complete interrupt
+        .HTIE = 1, // Enable half transfer complete interrupt
+    });
+
+    DMA.CPAR2.write_raw(@intFromPtr(&TIM1.CCR1));
+
+    TIM1.ARR.write_raw(65535);
+
+    // NOTE(robin): Work around limitation in regz
+    var reg = std.mem.zeroes(regs.CCMR1_Input);
+    reg.CC1S = 1; // Input TI1
+    TIM1.CCMR1_Output.write_raw(@bitCast(reg));
 }
 
 fn init_led_timer() void {

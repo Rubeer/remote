@@ -47,11 +47,39 @@ fn combine(comptime nums: []const IRQs) u32 {
     return combined;
 }
 
+pub inline fn full_memory_barrier() void {
+    asm volatile ("" ::: "memory");
+}
+
 pub fn enable_irqs(comptime nums: []const IRQs) void {
-    asm volatile ("" ::: "memory");
+    full_memory_barrier();
     regs.NVIC.ISER.write_raw(combine(nums));
-    asm volatile ("" ::: "memory");
+    full_memory_barrier();
 }
 pub fn disable_irqs(comptime nums: []const IRQs) void {
     regs.NVIC.ICER.write_raw(combine(nums));
+}
+
+pub fn system_reset() noreturn {
+    @setCold(true);
+    regs.SCB.AIRCR.set_others_zero(.{
+        .VECTKEYSTAT = 0x5FA,
+        .SYSRESETREQ = 1,
+    });
+
+    while (true) {
+        nop();
+    }
+}
+
+pub inline fn read_once(comptime T: type, ptr: *const volatile T) T {
+    return ptr.*;
+}
+
+pub inline fn write_once(comptime T: type, ptr: *volatile T, val: T) void {
+    ptr.* = val;
+}
+
+pub inline fn to_f32(comptime int: comptime_int) f32 {
+    return @floatFromInt(int);
 }

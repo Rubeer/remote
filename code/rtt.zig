@@ -1,4 +1,5 @@
 // The contents of this file is dual-licensed under the MIT or 0BSD license.
+// NOTE(robin): Modified from: https://github.com/rjsberry/rtt.zig
 
 //! A target-side implementation of the Real-Time Transfer protocol.
 //!
@@ -27,34 +28,50 @@ const atomic = std.atomic;
 const debug = std.debug;
 const fmt = std.fmt;
 
-const print_writer = Writer{ .chan = &_SEGGER_RTT.channel };
-
 /// Print something to the RTT channel.
 ///
 /// Uses the `std.fmt` plumbing under the hood.
 pub fn print(comptime fmt_str: []const u8, args: anytype) void {
-    fmt.format(print_writer, fmt_str, args) catch unreachable;
+    fmt.format(Writer{}, fmt_str, args) catch unreachable;
 }
 
 /// Print something to the RTT channel, with a newline.
 ///
 /// Uses the `std.fmt` plumbing under the hood.
 pub fn println(comptime fmt_str: []const u8, args: anytype) void {
-    fmt.format(print_writer, fmt_str ++ "\n", args) catch unreachable;
+    fmt.format(Writer{}, fmt_str ++ "\n", args) catch unreachable;
 }
 
-/// Write raw bytes directly to the RTT channel.
-///
-/// Does _not_ use the `std.fmt` plumbing.
-pub fn print_unformatted(bytes: []const u8) void {
-    print_writer.writeAll(bytes) catch unreachable;
+pub noinline fn print_channel_0(bytes: []const u8) void {
+    // NOTE(robin): Hardcoded to reduce code bloat
+    const chan = &_SEGGER_RTT.channel;
+    const buf = &BUF;
+
+    var xs = bytes;
+
+    while (xs.len != 0) {
+        const write = readVolatile(&chan.write);
+        const read = readVolatile(&chan.read);
+        const avail = maxContiguous(read, write);
+
+        const n = @min(xs.len, avail);
+        if (n == 0) {
+            // todo: add non-blocking impl with truncated writes
+            //debug.assert(readVolatile(&self.chan.flags) == RTT_MODE_BLOCK);
+            continue;
+        }
+
+        @memcpy(buf[write .. write + n], xs[0..n]);
+        xs = xs[n..];
+        writeVolatile(&chan.write, (write + n) % BUF_LEN);
+    }
 }
 
 const RTT_MODE_TRUNC = 1;
 const RTT_MODE_BLOCK = 2;
 
 const BUF_LEN = 1024;
-var BUF: [BUF_LEN]u8 = undefined;
+var BUF: [BUF_LEN]u8 align(4) = undefined;
 
 export var _SEGGER_RTT: extern struct {
     magic: [16]u8,
@@ -87,29 +104,11 @@ const Channel = extern struct {
 };
 
 const Writer = struct {
-    chan: *Channel,
-
     pub const Error = error{}; // infallible
 
-    pub noinline fn writeAll(self: Writer, bytes: []const u8) Writer.Error!void {
-        var xs = bytes;
-
-        while (xs.len != 0) {
-            const write = readVolatile(&self.chan.write);
-            const read = readVolatile(&self.chan.read);
-            const avail = maxContiguous(read, write);
-
-            const n = @min(xs.len, avail);
-            if (n == 0) {
-                // todo: add non-blocking impl with truncated writes
-                //debug.assert(readVolatile(&self.chan.flags) == RTT_MODE_BLOCK);
-                continue;
-            }
-
-            @memcpy(self.chan.buf[write .. write + n], xs[0..n]);
-            xs = xs[n..];
-            writeVolatile(&self.chan.write, (write + n) % BUF_LEN);
-        }
+    pub fn writeAll(self: Writer, bytes: []const u8) Writer.Error!void {
+        _ = self;
+        print_channel_0(bytes);
     }
 
     pub fn writeByteNTimes(

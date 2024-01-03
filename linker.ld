@@ -49,7 +49,7 @@ SECTIONS
     . = ALIGN(4);
   } > flash
   
-  ._stack :
+  .stack :
   {
     PROVIDE ( end = . );
     PROVIDE ( _end = . );
@@ -83,16 +83,14 @@ SECTIONS
 
   /DISCARD/ :
   {
-    libc.a ( * )
-    libm.a ( * )
-    libgcc.a ( * )
-
-      /* NOTE(robin): Shouldn't need these. Commented out so we get a link error if they are used by accident.
+    *(.ARM.exidx)
 
     *(.init)
     *(.fini)
-
-     */
+    
+    libc.a ( * )
+    libm.a ( * )
+    libgcc.a ( * )
   }
 }
 

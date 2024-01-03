@@ -4,8 +4,16 @@ const regs = @import("STM32G030.zig").devices.STM32G030.peripherals;
 const gpio = @import("gpio.zig");
 const board = @import("board.zig");
 const rtt = @import("rtt.zig");
+const util = @import("util.zig");
+
+// Receiver
+const TIM1 = regs.TIM1;
+
+// Transmitter
 const TIM16 = regs.TIM16;
+// Modulation
 const TIM17 = regs.TIM17;
+
 const DMA = regs.DMA;
 const RCC = regs.RCC;
 
@@ -73,11 +81,128 @@ pub fn transmit(cmd: *const IRCommand) void {
     TIM17.CR1.modify(.{ .CEN = 1 });
 }
 
+comptime {
+    const decoder: Decoder = undefined;
+    if (!std.math.isPowerOfTwo(decoder.raw_timing.len)) {
+        @compileError("Must be a power of two");
+    }
+}
+
+pub const Decoder = struct {
+    raw_timing: [128]u16,
+    prev_sample: u16,
+
+    at: u32,
+    in_carrier_count: u32,
+    carrier_guesses: [4]u16,
+
+    pulse_start: u16,
+
+    pulses: std.BoundedArray(packed struct { high: u16, low: u16 }, 128),
+
+    pub fn process(self: *Decoder) void {
+        const dma_counter = DMA.CNDTR2.read_raw();
+
+        const dma_at = if (dma_counter != 0)
+            self.raw_timing.len - dma_counter
+        else
+            0;
+
+        while (dma_at != self.at) {
+            const sample = util.read_once(u16, &self.raw_timing[self.at]);
+            const diff = sample -% self.prev_sample;
+            //rtt.println("{}", .{diff});
+
+            const period_20KHz = hw.clock_rate / 20000;
+            const period_30KHz = hw.clock_rate / 30000;
+            const period_45KHz = hw.clock_rate / 45000;
+
+            if (self.in_carrier_count < 4) {
+                // Some plausible frequency
+                if (diff < period_30KHz and diff > period_45KHz) {
+                    const freq: u16 = @truncate(hw.clock_rate / @as(u32, diff));
+                    self.carrier_guesses[self.in_carrier_count] = freq;
+                    self.in_carrier_count += 1;
+
+                    // Start of actual pulse started in the past, subtract the difference.
+                    self.pulse_start = sample -% diff;
+                } else {
+                    self.in_carrier_count = 0;
+                }
+            } else {
+                // End of the pulse, record it
+                if (diff > period_20KHz) {
+                    self.in_carrier_count = 0;
+                    const pulse_end = self.prev_sample;
+
+                    self.pulses.append(.{
+                        .high = self.prev_sample -% self.pulse_start,
+                        .low = sample -% pulse_end,
+                    }) catch |err| {
+                        rtt.println("pulses.append: {}", .{err});
+                    };
+                }
+            }
+
+            self.prev_sample = sample;
+
+            self.at = (self.at + 1) & (self.raw_timing.len - 1);
+        }
+
+        if (self.pulses.len > 0) {
+            const diff = TIM1.CNT.read().CNT -% self.prev_sample;
+            const timeout = 65536 / 2;
+            if (diff > timeout) {
+                if (self.in_carrier_count > 0) {
+                    // Finish the last pulse after timeout
+                    self.in_carrier_count = 0;
+                    self.pulses.append(.{
+                        .high = self.prev_sample -% self.pulse_start,
+                        .low = 0,
+                    }) catch |err| {
+                        rtt.println("pulses.append: {}", .{err});
+                    };
+                }
+
+                for (self.pulses.slice()) |pulse| {
+                    rtt.print("{}, {}, ", .{ pulse.high, pulse.low });
+                }
+                rtt.print_channel_0("\n");
+
+                self.pulses.resize(0) catch unreachable;
+            }
+        }
+    }
+};
+
+pub fn enable_receiver(decoder: *Decoder) void {
+    DMA.CMAR2.write_raw(@intFromPtr(&decoder.raw_timing));
+    DMA.CNDTR2.write_raw(decoder.raw_timing.len);
+    DMA.CCR2.modify(.{ .EN = 1 });
+    TIM1.DIER.modify(.{ .CC1DE = 1 });
+    TIM1.CCER.modify(.{ .CC1E = 1 });
+    TIM1.CR1.modify(.{ .CEN = 1 });
+
+    gpio.configure(board.ir_receiver_enabled);
+
+    //RCC.APBENR2.modify(.{ .TIM1EN = 0 });
+}
+
 /// Fires when IR transmit is done
 pub fn DMA_Channel1_IRQHandler() callconv(.C) void {
     gpio.configure(board.ir_output_off);
     TIM16.CR1.modify(.{ .CEN = 0 });
     TIM17.CR1.modify(.{ .CEN = 0 });
-    DMA.IFCR.set_others_zero(.{ .CTCIF1 = 1 });
+    DMA.IFCR.set_others_zero(.{ .CTCIF1 = 1 }); // Clear transfer complete interrupt
     rtt.println("Transmit done", .{});
+}
+
+// Fires when some IR received timings should be processed.
+// Received samples are processed after wakeup from WFI
+pub fn DMA_Channel2_3_IRQHandler() callconv(.C) void {
+    DMA.IFCR.set_others_zero(.{
+        // Actually channel 2, not 6 and 5. The svd does not make sense
+        .CTCIF5 = 1, // Clear channel 2 transfer complete interrupt
+        .CHTIF6 = 1, // Clear channel 2 half transfer complete interrupt
+    });
 }
