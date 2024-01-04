@@ -23,6 +23,7 @@
 //! ```
 
 const std = @import("std");
+const util = @import("util.zig");
 
 const atomic = std.atomic;
 const debug = std.debug;
@@ -42,74 +43,83 @@ pub fn println(comptime fmt_str: []const u8, args: anytype) void {
     fmt.format(Writer{}, fmt_str ++ "\n", args) catch unreachable;
 }
 
+// NOTE(robin): noinline and hardcoded to reduce code bloat
+/// Print without formatting to up channel 0
 pub noinline fn print_channel_0(bytes: []const u8) void {
-    // NOTE(robin): Hardcoded to reduce code bloat
     const chan = &_SEGGER_RTT.channel;
     const buf = &BUF;
 
     var xs = bytes;
 
-    while (xs.len != 0) {
-        const write = readVolatile(&chan.write);
-        const read = readVolatile(&chan.read);
+    var write = readVolatile(&chan.write);
+    const read = readVolatile(&chan.read);
+
+    inline for (0..2) |i| {
         const avail = maxContiguous(read, write);
-
         const n = @min(xs.len, avail);
-        if (n == 0) {
-            return;
-        }
-
+        if (i == 1 and n == 0) break;
         @memcpy(buf[write .. write + n], xs[0..n]);
         xs = xs[n..];
-        writeVolatile(&chan.write, (write + n) % BUF_LEN);
+        write = (write + n) & (buf.len - 1);
     }
+
+    writeVolatile(&chan.write, write);
 }
 
 const RTT_MODE_TRUNC = 1;
 const RTT_MODE_BLOCK = 2;
 
-const BUF_LEN = 1024;
-var BUF: [BUF_LEN]u8 align(4) = undefined;
+var BUF: [1024]u8 align(4) linksection(".rtt") = undefined;
 
 export var _SEGGER_RTT: extern struct {
     magic: [16]u8,
-    max_up_channels: usize,
-    max_down_channels: usize,
+    max_up_channels: u32,
+    max_down_channels: u32,
     channel: Channel,
-} = .{
-    .magic = [_]u8{
-        'S', 'E', 'G', 'G', 'E', 'R', ' ', 'R', 'T', 'T', 0, 0, 0, 0, 0, 0,
-    },
-    .max_up_channels = 1,
-    .max_down_channels = 0,
-    .channel = .{
-        .name = "rtt.zig",
-        .buf = &BUF,
-        .bufsz = BUF_LEN,
-        .write = 0,
-        .read = 0,
-        .flags = RTT_MODE_BLOCK,
-    },
-};
+} align(4) linksection(".rtt") = undefined;
 
 const Channel = extern struct {
-    name: [*]const u8,
-    buf: [*]u8,
-    bufsz: usize,
-    write: usize,
-    read: usize,
-    flags: usize,
+    name: [*:0]const u8,
+    buf: *[BUF.len]u8,
+    bufsz: u32,
+    write: u32,
+    read: u32,
+    flags: u32,
 };
+
+pub fn init() void {
+    _SEGGER_RTT.max_up_channels = 1;
+    _SEGGER_RTT.max_down_channels = 0;
+    _SEGGER_RTT.channel = .{
+        .name = "rtt.zig",
+        .buf = &BUF,
+        .bufsz = BUF.len,
+        .write = 0,
+        .read = 0,
+        .flags = RTT_MODE_TRUNC,
+    };
+
+    // Copy in separate parts so we don't accidently end up with
+    // the string "SEGGER RTT" somewhere else in memory
+    // (Which may cause the RTT control block to be detected in the wrong place)
+    util.full_memory_barrier();
+    _SEGGER_RTT.magic[7..10].* = "RTT".*;
+    util.full_memory_barrier();
+    _SEGGER_RTT.magic[0..6].* = "SEGGER".*;
+    util.full_memory_barrier();
+    _SEGGER_RTT.magic[6] = ' ';
+    util.full_memory_barrier();
+}
 
 const Writer = struct {
     pub const Error = error{}; // infallible
 
-    pub fn writeAll(self: Writer, bytes: []const u8) Writer.Error!void {
+    pub inline fn writeAll(self: Writer, bytes: []const u8) Writer.Error!void {
         _ = self;
         print_channel_0(bytes);
     }
 
-    pub fn writeByteNTimes(
+    pub inline fn writeByteNTimes(
         self: Writer,
         byte: u8,
         n: usize,
@@ -118,19 +128,19 @@ const Writer = struct {
     }
 };
 
-inline fn readVolatile(ptr: *const volatile usize) usize {
+inline fn readVolatile(ptr: *const volatile u32) u32 {
     return ptr.*;
 }
 
-inline fn writeVolatile(ptr: *volatile usize, val: usize) void {
+inline fn writeVolatile(ptr: *volatile u32, val: u32) void {
     ptr.* = val;
 }
 
-inline fn maxContiguous(read: usize, write: usize) usize {
+inline fn maxContiguous(read: u32, write: u32) u32 {
     return if (read > write)
         read - write - 1
     else if (read == 0)
-        BUF_LEN - write - 1
+        BUF.len - write - 1
     else
-        BUF_LEN - write;
+        BUF.len - write;
 }

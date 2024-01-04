@@ -5,10 +5,10 @@ const ir = @import("ir.zig");
 const keys = @import("keymatrix.zig");
 
 extern const _data_start_in_flash: u8;
-extern const _data_start_in_ram: u8;
-extern const _data_end_in_ram: u8;
-extern const _bss_start: u8;
-extern const _bss_end: u8;
+extern var _data_start_in_ram: u8;
+extern var _data_end_in_ram: u8;
+extern var _bss_start: u8;
+extern var _bss_end: u8;
 
 extern fn _end_of_stack() void; // This is not really a function, but zig has trouble putting a u32 in the vector table
 
@@ -31,6 +31,9 @@ export fn Reset_Handler() callconv(.C) noreturn {
 
         @memcpy(data_start[0..data_len], data_source[0..data_len]);
     }
+
+    rtt.init();
+
     hw.init_peripherals();
 
     @import("main.zig").main();

@@ -11,18 +11,7 @@ _stack_size = 2K;
 _flash_start = ORIGIN(flash);
 _flash_size = LENGTH(flash);
 
-/*
 
-SECTIONS
-{
-    .rtt :
-    {
-        KEEP(*(.rtt))
-        . = ALIGN(4);
-    } > ram
-}
-
-*/
 
 
 ENTRY(Reset_Handler)
@@ -55,6 +44,12 @@ SECTIONS
     PROVIDE ( _end = . );
     . = . + _stack_size;
     _end_of_stack = .;
+  } > ram
+  
+  .rtt :
+  {
+      KEEP(*(.rtt))
+      . = ALIGN(4);
   } > ram
   
   _data_start_in_flash = LOADADDR(.data);
