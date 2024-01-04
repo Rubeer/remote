@@ -44,7 +44,7 @@ pub const startup_pin_config = .{
     Cfg{ .name = pins.ir_in, .mode = .alternate, .alt_mode = .AF2, .pull = .none },
 
     Cfg{ .name = pins.ir_out, .mode = .output, .alt_mode = .AF0, .output_type = .push_pull, .level = .low },
-    Cfg{ .name = pins.ir_out_boost, .mode = .output, .level = .high },
+    Cfg{ .name = pins.ir_out_boost, .mode = .output, .level = .low},
 
     Cfg{ .name = pins.encoder_push, .mode = .input, .pull = .up },
     Cfg{ .name = pins.encoder_wkup, .mode = .analog, .pull = .none },

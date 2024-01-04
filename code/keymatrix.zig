@@ -4,6 +4,7 @@ const board = @import("board.zig");
 const util = @import("util.zig");
 const rtt = @import("rtt.zig");
 const hw = @import("hw.zig");
+const ir = @import("ir.zig");
 
 const TIM14 = board.regs.TIM14;
 const GPIOA = gpio.GPIOA;
@@ -110,6 +111,21 @@ pub fn led_setup() void {
 
 fn handle_key_change(row: u8, col: u8, pressed: bool) void {
     matrix[row][col].input_state = pressed;
+
+    if(pressed) {
+        if(!ir.is_transmit_busy())
+        {
+            if(row == 0 and col == 1) {
+                ir.transmit(&ir.panasonic_volume_up);
+            }
+            if(row == 1 and col == 1) {
+                ir.transmit(&ir.panasonic_volume_down);
+            }
+        }
+    }
+    
+    
+
     //if (pressed) matrix[row][col].brightness = 1;
     //led_setup();
     rtt.println("Change: {},{} = {}", .{ row, col, pressed });

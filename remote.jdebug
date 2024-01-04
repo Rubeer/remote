@@ -29,7 +29,7 @@ void OnProjectLoad (void) {
   Project.SetTargetIF ("SWD");
   Project.SetTIFSpeed ("4 MHz");
   Project.AddSvdFile ("$(InstallDir)/Config/CPU/Cortex-M0.svd");
-  Project.AddSvdFile ("/home/robin/remote/STM32G030.svd");
+  Project.AddSvdFile ("STM32G030.svd");
   //
   // User settings
   //

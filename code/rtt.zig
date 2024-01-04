@@ -56,9 +56,7 @@ pub noinline fn print_channel_0(bytes: []const u8) void {
 
         const n = @min(xs.len, avail);
         if (n == 0) {
-            // todo: add non-blocking impl with truncated writes
-            //debug.assert(readVolatile(&self.chan.flags) == RTT_MODE_BLOCK);
-            continue;
+            return;
         }
 
         @memcpy(buf[write .. write + n], xs[0..n]);

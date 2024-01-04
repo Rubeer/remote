@@ -83,7 +83,9 @@ pub fn init_peripherals() void {
 }
 
 pub fn read_encoder() i16 {
-    return -(@as(i16, @bitCast(TIM3.CNT.read().CNT_L)) >> 1);
+    const signed: i16 = @bitCast(TIM3.CNT.read().CNT_L);
+    const div2 = @divTrunc(signed,  2);
+    return -div2;
 }
 
 fn init_encoder() void {
@@ -134,7 +136,7 @@ fn init_ir_transmitter() void {
     // CMAR1 is set in transmit function
 
     TIM16.ARR.write_raw(10000);
-    TIM16.PSC.write_raw(15);
+    TIM16.PSC.write_raw(0);
     TIM16.CCMR1_Output.modify(.{
         .OC1M = .forced_inactive,
         .OC1M_2 = 0,
