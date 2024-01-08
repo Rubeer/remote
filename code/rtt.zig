@@ -63,6 +63,7 @@ pub noinline fn print_channel_0(bytes: []const u8) void {
         write = (write + n) & (buf.len - 1);
     }
 
+    util.full_memory_barrier();
     writeVolatile(&chan.write, write);
 }
 

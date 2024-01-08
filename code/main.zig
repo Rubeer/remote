@@ -111,6 +111,10 @@ fn led_animation_update(state: *State) void {
     }
 }
 
+fn enter_sleep_mode() void {
+    util.wfi();
+}
+
 var decoder: ir.Decoder = undefined;
 
 pub fn main() noreturn {

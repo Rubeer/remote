@@ -7,8 +7,8 @@ pub fn wfi() void {
 pub fn nop() void {
     asm volatile ("nop");
 }
-pub noinline fn nops(count: u32) void {
-    for (0..count) |_|
+pub inline fn nops(count: u32) void {
+    inline for (0..count) |_|
         asm volatile ("nop");
 }
 
@@ -58,6 +58,7 @@ pub fn enable_irqs(comptime nums: []const IRQs) void {
 }
 pub fn disable_irqs(comptime nums: []const IRQs) void {
     regs.NVIC.ICER.write_raw(combine(nums));
+    full_memory_barrier();
 }
 
 pub fn system_reset() noreturn {

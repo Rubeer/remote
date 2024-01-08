@@ -2,6 +2,7 @@ const std = @import("std");
 const gpio = @import("gpio.zig");
 const board = @import("board.zig");
 const util = @import("util.zig");
+const keys = @import("keymatrix.zig");
 
 const regs = board.regs;
 const RCC = regs.RCC;
@@ -30,8 +31,8 @@ pub fn get_ticks() u32 {
 pub fn init_clock() void {
     // HSI is already enabled startup at 16 MHz.
     // We don't need more than that for this application.
-    // Make sure it stays enabled:
-    RCC.CR.modify(.{ .HSIKERON = 1 });
+
+    regs.PWR.CR1.modify(.{ .VOS = 0b01 }); // Range 1 (low power)
 }
 
 pub fn init_peripherals() void {
@@ -68,10 +69,13 @@ pub fn init_peripherals() void {
 
     gpio.configure(board.startup_pin_config);
 
+    regs.EXTI.FTSR1.write_raw(keys.cols_mask);
+    regs.EXTI.IMR1.write_raw(keys.cols_mask);
+
     init_encoder();
     init_ir_transmitter();
-    init_led_timer();
     init_ir_receiver();
+    init_led_timer();
 
     // Enable SysTick 10ms interval
     regs.STK.RVR.write_raw((clock_rate * systick_interval_ms) / 1000);
@@ -84,7 +88,7 @@ pub fn init_peripherals() void {
 
 pub fn read_encoder() i16 {
     const signed: i16 = @bitCast(TIM3.CNT.read().CNT_L);
-    const div2 = @divTrunc(signed,  2);
+    const div2 = @divTrunc(signed, 2);
     return -div2;
 }
 
@@ -159,6 +163,12 @@ fn init_ir_transmitter() void {
         .IR_POL = 1,
         .IR_MOD = 0, // TIM16
     });
+
+    // Re-enabled once we need to transmit
+    RCC.APBENR2.modify(.{
+        .TIM16EN = 0,
+        .TIM17EN = 0,
+    });
 }
 
 fn init_ir_receiver() void {
@@ -194,4 +204,16 @@ fn init_led_timer() void {
     TIM14.PSC.write_raw(15); // 1 us resolution
     TIM14.CR1.modify(.{ .OPM = 1 }); // One pulse mode
     TIM14.DIER.modify(.{ .UIE = 1 }); // Enable update interrupt
+}
+
+/// Go to stop 1 mode, wake up from EXTI handlers
+/// (Any button or encoder input)
+pub fn go_to_sleep() void {
+    util.disable_irqs(&.{.TIM14});
+    gpio.configure(board.sleep_config);
+    regs.EXTI.FPR1.write_raw(keys.cols_mask);
+    regs.PWR.CR1.modify(.{ .LPMS = 0b001 });
+    regs.SCB.SCR.modify(.{ .SLEEPDEEP = 1 });
+    util.wfi();
+    regs.SCB.SCR.modify(.{ .SLEEPDEEP = 0 });
 }

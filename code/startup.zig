@@ -14,6 +14,7 @@ extern fn _end_of_stack() void; // This is not really a function, but zig has tr
 
 export fn Reset_Handler() callconv(.C) noreturn {
     hw.init_clock();
+    rtt.init();
 
     {
         const bss_start: [*]u8 = @ptrCast(&_bss_start);
@@ -31,8 +32,6 @@ export fn Reset_Handler() callconv(.C) noreturn {
 
         @memcpy(data_start[0..data_len], data_source[0..data_len]);
     }
-
-    rtt.init();
 
     hw.init_peripherals();
 

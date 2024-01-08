@@ -6,7 +6,8 @@ const rtt = @import("rtt.zig");
 const hw = @import("hw.zig");
 const ir = @import("ir.zig");
 
-const TIM14 = board.regs.TIM14;
+const regs = board.regs;
+const TIM14 = regs.TIM14;
 const GPIOA = gpio.GPIOA;
 
 pub const rows = [_]gpio.Pin{
@@ -21,6 +22,17 @@ pub const columns = [_]gpio.Pin{
     gpio.parse_pin(board.pins.col2),
     gpio.parse_pin(board.pins.col3),
 };
+
+pub fn make_mask(comptime array: []const gpio.Pin) u32 {
+    var mask: u32 = 0;
+    inline for (array) |pin| {
+        mask |= @as(u32, 1) << pin.pin;
+    }
+    return mask;
+}
+
+pub const cols_mask = make_mask(&columns);
+pub const rows_mask = make_mask(&rows);
 
 pub var matrix: [rows.len][columns.len]MatrixNode = undefined;
 
@@ -60,7 +72,6 @@ pub fn led_setup() void {
     var timing: LedTiming = undefined;
     timing.num = 0;
     timing.at = 0;
-    var total_brightness: f32 = 0;
 
     for (0..rows.len) |row_index| {
         for (0..columns.len) |column_index| {
@@ -71,7 +82,6 @@ pub fn led_setup() void {
             const node = &matrix[row_index][column_index];
 
             if (node.brightness > 0) {
-                total_brightness += node.brightness * node.brightness;
                 timing.matrix_lookup[timing.num] = EncodedNode.encode(row_index, column_index);
                 timing.num += 1;
             }
@@ -80,13 +90,9 @@ pub fn led_setup() void {
 
     const total_budget = 20000;
     const total_budget_float: f32 = @floatFromInt(total_budget);
+    const num_leds = 10;
 
-    var led_factor: f32 = 1;
-    if (total_brightness > 10) {
-        led_factor = 10.0 / total_brightness;
-    }
-
-    const budget_per_led: f32 = led_factor * (total_budget_float * 0.1);
+    const budget_per_led: f32 = total_budget_float / num_leds;
     var budget_used: u32 = 0;
 
     for (0..timing.num) |i| {
@@ -115,7 +121,8 @@ fn handle_key_change(row: u8, col: u8, pressed: bool) void {
     if (pressed) {
         if (!ir.is_transmit_busy()) {
             if (row == 0 and col == 1) {
-                ir.transmit(&ir.panasonic_volume_up);
+                //ir.transmit(&ir.panasonic_volume_up);
+                hw.go_to_sleep();
             }
             if (row == 1 and col == 1) {
                 ir.transmit(&ir.panasonic_volume_down);
@@ -132,14 +139,6 @@ var last_scanout_ticks: u32 = 0;
 var current_scanout: ?[rows.len]u8 = null;
 var previous_scanout = [1]u8{0xFF} ** rows.len;
 
-pub fn make_cols_mask() u8 {
-    var mask: u32 = 0;
-    inline for (columns) |col| {
-        mask |= @as(u32, 1) << col.pin;
-    }
-    return @truncate(mask);
-}
-
 pub fn scanout_update() void {
     util.disable_irqs(&.{.TIM14});
     const new_scanout = current_scanout;
@@ -147,7 +146,6 @@ pub fn scanout_update() void {
     util.enable_irqs(&.{.TIM14});
 
     if (new_scanout) |scanout| {
-        const cols_mask = comptime make_cols_mask();
         for (scanout, 0..) |bits, i| {
             const diff = bits ^ previous_scanout[i];
             if (diff & cols_mask != 0) {
@@ -165,13 +163,12 @@ pub fn scanout_update() void {
 
 fn do_key_scanout() [rows.len]u8 {
     var result: [rows.len]u8 = undefined;
-    last_scanout_ticks = 0;
 
     for (rows, &result) |row, *result_row| {
         row.set_low();
 
         // Adequate delay with 16MHz clock
-        util.nops(15);
+        util.nops(5);
 
         result_row.* = @truncate(GPIOA.IDR.read_raw());
 
@@ -197,12 +194,11 @@ pub fn TIM14_IRQHandler() callconv(.C) void {
         current_scanout = do_key_scanout();
     }
 
-    const timing = &g_active_timing;
-
     gpio.configure(board.cols_as_opendrain_highz);
     gpio.configure(board.rows_highz);
 
     blk: {
+        const timing = &g_active_timing;
         if (timing.num > 0) {
             if (timing.at >= timing.num) {
                 timing.at = 0;

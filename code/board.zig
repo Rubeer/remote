@@ -44,12 +44,24 @@ pub const startup_pin_config = .{
     Cfg{ .name = pins.ir_in, .mode = .alternate, .alt_mode = .AF2, .pull = .none },
 
     Cfg{ .name = pins.ir_out, .mode = .output, .alt_mode = .AF0, .output_type = .push_pull, .level = .low },
-    Cfg{ .name = pins.ir_out_boost, .mode = .output, .level = .low},
+    Cfg{ .name = pins.ir_out_boost, .mode = .output, .level = .low },
 
     Cfg{ .name = pins.encoder_push, .mode = .input, .pull = .up },
     Cfg{ .name = pins.encoder_wkup, .mode = .analog, .pull = .none },
     Cfg{ .name = pins.encoder_a, .mode = .alternate, .alt_mode = .AF1, .pull = .up },
     Cfg{ .name = pins.encoder_b, .mode = .alternate, .alt_mode = .AF1, .pull = .up },
+};
+
+pub const sleep_config = .{
+    Cfg{ .name = pins.row1, .mode = .output, .level = .low },
+    Cfg{ .name = pins.row2, .mode = .output, .level = .low },
+    Cfg{ .name = pins.row3, .mode = .output, .level = .low },
+    Cfg{ .name = pins.row4, .mode = .output, .level = .low },
+    Cfg{ .name = pins.col1, .mode = .input, .pull = .up },
+    Cfg{ .name = pins.col2, .mode = .input, .pull = .up },
+    Cfg{ .name = pins.col3, .mode = .input, .pull = .up },
+
+    Cfg{ .name = pins.ir_in_enable, .mode = .output, .level = .high },
 };
 
 pub const cols_as_input = .{
@@ -65,10 +77,10 @@ pub const cols_as_opendrain_highz = .{
 };
 
 pub const rows_highz = .{
-    Cfg{ .name = pins.row1, .mode = .analog },
-    Cfg{ .name = pins.row2, .mode = .analog },
-    Cfg{ .name = pins.row3, .mode = .analog },
-    Cfg{ .name = pins.row4, .mode = .analog },
+    Cfg{ .name = pins.row1, .mode = .analog, .level = .high },
+    Cfg{ .name = pins.row2, .mode = .analog, .level = .high },
+    Cfg{ .name = pins.row3, .mode = .analog, .level = .high },
+    Cfg{ .name = pins.row4, .mode = .analog, .level = .high },
 };
 
 pub const rows_high_output = .{

@@ -150,7 +150,7 @@ fn combine_writes(comptime config: anytype, comptime fieldname: []const u8) [por
     return result;
 }
 
-fn apply_regmod(addr: *volatile u32, comptime mod: RegMod) void {
+inline fn apply_regmod(addr: *volatile u32, comptime mod: RegMod) void {
     if (mod.mask != 0) {
         var tmp = addr.*;
         tmp &= @truncate(~mod.mask);
@@ -159,7 +159,7 @@ fn apply_regmod(addr: *volatile u32, comptime mod: RegMod) void {
     }
 }
 
-pub fn configure(comptime config: anytype) void {
+pub inline fn configure(comptime config: anytype) void {
     const level = comptime combine_writes(config, "level");
     const output_type = comptime combine_writes(config, "output_type");
     const mode = comptime combine_writes(config, "mode");
@@ -167,6 +167,12 @@ pub fn configure(comptime config: anytype) void {
     const altmode = comptime combine_writes(config, "alt_mode");
 
     inline for (ports, 0..) |port, i| {
+        apply_regmod(&port.PUPDR.raw, pull[i]);
+        apply_regmod(&port.AFRL.raw, altmode[i]);
+        apply_regmod(&port.AFRH.raw, altmode[i].upper());
+        apply_regmod(&port.OTYPER.raw, output_type[i]);
+        apply_regmod(&port.MODER.raw, mode[i]);
+
         if (level[i].mask != 0) {
             const set_bits = level[i].bits;
             const reset_bits = level[i].bits ^ level[i].mask;
@@ -176,12 +182,5 @@ pub fn configure(comptime config: anytype) void {
                 port.BSRR.write_raw(combined);
             }
         }
-
-        apply_regmod(&port.OTYPER.raw, output_type[i]);
-        apply_regmod(&port.MODER.raw, mode[i]);
-        apply_regmod(&port.PUPDR.raw, pull[i]);
-
-        apply_regmod(&port.AFRL.raw, altmode[i]);
-        apply_regmod(&port.AFRH.raw, altmode[i].upper());
     }
 }
