@@ -5,6 +5,7 @@ const gpio = @import("gpio.zig");
 const hw = @import("hw.zig");
 const ir = @import("ir.zig");
 const keys = @import("keymatrix.zig");
+const adc = @import("adc.zig");
 
 pub const State = struct {
     last_encoder_count: i16 = 0,
@@ -71,11 +72,10 @@ fn encoder_update(state: *State) void {
     }
 }
 
-fn led_animation_update(state: *State) void {
-    const now = hw.get_ticks();
-    const led_elapsed = now -% state.led_fade_timer;
+fn led_animation_update(state: *State, ticks: u32) void {
+    const led_elapsed = ticks -% state.led_fade_timer;
     if (led_elapsed >= 10) {
-        state.led_fade_timer = now;
+        state.led_fade_timer = ticks;
         var updated: bool = false;
         const led_elapsed_f32: f32 = @floatFromInt(led_elapsed);
 
@@ -111,10 +111,6 @@ fn led_animation_update(state: *State) void {
     }
 }
 
-fn enter_sleep_mode() void {
-    util.wfi();
-}
-
 var decoder: ir.Decoder = undefined;
 
 pub fn main() noreturn {
@@ -130,10 +126,13 @@ pub fn main() noreturn {
     var state: State = .{};
 
     while (true) {
+        const ticks = hw.get_ticks();
+
+        adc.update(ticks);
         decoder.process();
         encoder_update(&state);
         keys.scanout_update();
-        led_animation_update(&state);
+        led_animation_update(&state, ticks);
 
         util.wfi();
     }

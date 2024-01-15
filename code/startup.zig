@@ -3,6 +3,7 @@ const rtt = @import("rtt.zig");
 const hw = @import("hw.zig");
 const ir = @import("ir.zig");
 const keys = @import("keymatrix.zig");
+const adc = @import("adc.zig");
 
 extern const _data_start_in_flash: u8;
 extern var _data_start_in_ram: u8;
@@ -57,4 +58,5 @@ export const vector_table linksection(".vector_table") = svd.devices.STM32G030.V
     .DMA_Channel2_3 = ir.DMA_Channel2_3_IRQHandler,
     .TIM14 = keys.TIM14_IRQHandler,
     .SysTick = hw.SysTick_Handler,
+    .ADC_COMP = adc.ADC_COMP_IRQHandler,
 };

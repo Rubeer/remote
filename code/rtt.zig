@@ -120,12 +120,8 @@ const Writer = struct {
         print_channel_0(bytes);
     }
 
-    pub inline fn writeByteNTimes(
-        self: Writer,
-        byte: u8,
-        n: usize,
-    ) Writer.Error!void {
-        for (0..n) |_| self.writeAll(&[_]u8{byte}) catch unreachable;
+    pub inline fn writeBytesNTimes(self: Writer, bytes: []const u8, n: usize) Writer.Error!void {
+        for (0..n) |_| try self.writeAll(bytes);
     }
 };
 

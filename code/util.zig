@@ -81,6 +81,12 @@ pub inline fn write_once(comptime T: type, ptr: *volatile T, val: T) void {
     ptr.* = val;
 }
 
-pub inline fn to_f32(comptime int: comptime_int) f32 {
-    return @floatFromInt(int);
+pub inline fn bit(bitpos: u5) u32 {
+    return @as(u32, 1) << bitpos;
+}
+
+pub fn busywait(cycles: u23) void {
+    const start = regs.STK.CVR.read().CURRENT;
+    // SysTick counts DOWN!
+    while (start -% regs.STK.CVR.read().CURRENT < cycles) {}
 }

@@ -19,6 +19,8 @@ pub fn build(b: *std.Build) void {
     });
 
     fw.entry = .{ .symbol_name = "Reset_Handler" };
+    fw.link_function_sections = true;
+    fw.link_data_sections = true;
     fw.link_gc_sections = true;
     fw.setLinkerScriptPath(.{ .path = "linker.ld" });
 

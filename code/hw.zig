@@ -13,6 +13,7 @@ const TIM16 = regs.TIM16;
 const TIM17 = regs.TIM17;
 const DMA = regs.DMA;
 const DMAMUX = regs.DMAMUX;
+const ADC = regs.ADC;
 
 const IRQs = util.IRQs;
 
@@ -47,6 +48,7 @@ pub fn init_peripherals() void {
         .TIM14EN = 1,
         .TIM16EN = 1,
         .TIM17EN = 1,
+        .ADCEN = 1,
     });
 
     RCC.AHBENR.modify(.{
@@ -65,6 +67,7 @@ pub fn init_peripherals() void {
         IRQs.DMA1_Channel2_3,
         IRQs.TIM16,
         IRQs.TIM14,
+        IRQs.ADC1,
     });
 
     gpio.configure(board.startup_pin_config);
@@ -72,18 +75,19 @@ pub fn init_peripherals() void {
     regs.EXTI.FTSR1.write_raw(keys.cols_mask);
     regs.EXTI.IMR1.write_raw(keys.cols_mask);
 
-    init_encoder();
-    init_ir_transmitter();
-    init_ir_receiver();
-    init_led_timer();
-
     // Enable SysTick 10ms interval
-    regs.STK.RVR.write_raw((clock_rate * systick_interval_ms) / 1000);
+    regs.STK.RVR.write_raw(((clock_rate * systick_interval_ms) / 1000) - 1);
     regs.STK.CSR.modify(.{
         .ENABLE = 1,
         .CLKSOURCE = 1,
         .TICKINT = 1,
     });
+
+    init_vbat_measure();
+    init_encoder();
+    init_ir_transmitter();
+    init_ir_receiver();
+    init_led_timer();
 }
 
 pub fn read_encoder() i16 {
@@ -204,6 +208,10 @@ fn init_led_timer() void {
     TIM14.PSC.write_raw(15); // 1 us resolution
     TIM14.CR1.modify(.{ .OPM = 1 }); // One pulse mode
     TIM14.DIER.modify(.{ .UIE = 1 }); // Enable update interrupt
+}
+
+fn init_vbat_measure() void {
+    @import("adc.zig").init();
 }
 
 /// Go to stop 1 mode, wake up from EXTI handlers
