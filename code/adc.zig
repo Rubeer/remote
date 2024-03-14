@@ -23,22 +23,11 @@ const ADC_State = struct {
 
     state: State,
     vrefint_raw: u16,
-    vrefint_mv: u16,
+    vrefp_mv: u16,
     last_sample_time: u32,
 };
 
 var adc_state: ADC_State = undefined;
-
-pub var vrefint_raw: u16 = 0;
-pub var vin_mv: u16 = 0;
-
-fn set_state(state: ADC_State.State) void {
-    util.write_once(ADC_State.State, &adc_state.state, state);
-}
-
-fn get_state() ADC_State.State {
-    return util.read_once(ADC_State.State, &adc_state.state);
-}
 
 pub fn init() void {
     vrefint_mult = VREFINT_CAL_VOLTAGE * @as(u32, VREFINT_CAL_ADDR.*);
@@ -46,13 +35,13 @@ pub fn init() void {
     ADC.IER.modify(.{ .EOCALIE = 1 });
     enable_voltage_regulator();
     ADC.CR.modify(.{ .ADCAL = 1 });
-    set_state(.calibrating);
+    util.write_volatile(&adc_state.state, .calibrating);
     // ADC init continues in adc interrupt (EOCAL)
 }
 
 fn enable_voltage_regulator() void {
     ADC.CR.modify(.{ .ADVREGEN = 1 });
-    util.busywait(hw.clock_rate / (1_000_000 / 20)); // tADCVREG_SETUP = 20 microseconds
+    util.busywait_us(20); // tADCVREG_SETUP
 }
 
 fn disable() void {
@@ -66,7 +55,7 @@ fn disable() void {
     ADC.CR.modify(.{ .ADVREGEN = 0 });
 
     regs.RCC.APBENR2.modify(.{ .ADCEN = 0 });
-    set_state(.disabled);
+    util.write_volatile(&adc_state.state, .disabled);
 }
 
 fn enable() void {
@@ -90,28 +79,27 @@ pub fn ADC_COMP_IRQHandler() callconv(.C) void {
         ADC.IER.modify(.{ .EOCIE = 1 });
 
         ADC.CR.modify(.{ .ADSTART = 1 });
-        set_state(.doing_conversion);
+        util.write_volatile(&adc_state.state, .doing_conversion);
     }
 
     if (isr.EOC == 1) {
-        util.write_once(u16, &vrefint_raw, ADC.DR.read().regularDATA);
-        set_state(.conversion_done);
+        const sample: u16 = ADC.DR.read().regularDATA;
+        util.write_volatile(&adc_state.vrefint_raw, sample);
+        util.write_volatile(&adc_state.state, .conversion_done);
     }
 
     ADC.ISR.write(isr);
 }
 
 pub fn update(ticks: u32) void {
-    const state = get_state();
-
+    const state = util.read_volatile(&adc_state.state);
     switch (state) {
         .conversion_done => {
             disable();
-
-            const vref_mv = vrefint_mult / vrefint_raw;
-            rtt.println("{} -> {} mV", .{ vrefint_raw, vref_mv });
+            adc_state.vrefp_mv = @intCast(vrefint_mult / adc_state.vrefint_raw);
+            rtt.println("{} -> {} mV", .{ adc_state.vrefint_raw, adc_state.vrefp_mv });
             adc_state.last_sample_time = ticks;
-            set_state(.disabled);
+            util.write_volatile(&adc_state.state, .disabled);
         },
         .disabled => {
             if ((ticks - adc_state.last_sample_time) > vbat_sample_interval) {

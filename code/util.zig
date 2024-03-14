@@ -1,4 +1,5 @@
 const std = @import("std");
+const hw = @import("hw.zig");
 const regs = @import("board.zig").regs;
 
 pub fn wfi() void {
@@ -73,12 +74,12 @@ pub fn system_reset() noreturn {
     }
 }
 
-pub inline fn read_once(comptime T: type, ptr: *const volatile T) T {
-    return ptr.*;
+pub inline fn read_volatile(addr: anytype) @TypeOf(addr.*) {
+    return @as(*volatile @TypeOf(addr.*), addr).*;
 }
 
-pub inline fn write_once(comptime T: type, ptr: *volatile T, val: T) void {
-    ptr.* = val;
+pub inline fn write_volatile(addr: anytype, value: @TypeOf(addr.*)) void {
+    @as(*volatile @TypeOf(addr.*), addr).* = value;
 }
 
 pub inline fn bit(bitpos: u5) u32 {
@@ -89,4 +90,9 @@ pub fn busywait(cycles: u23) void {
     const start = regs.STK.CVR.read().CURRENT;
     // SysTick counts DOWN!
     while (start -% regs.STK.CVR.read().CURRENT < cycles) {}
+}
+
+pub inline fn busywait_us(us: u8) void {
+    const cycles = (hw.clock_rate * @as(u32, us)) / 1_000_000;
+    busywait(@intCast(cycles));
 }

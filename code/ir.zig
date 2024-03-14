@@ -124,7 +124,7 @@ pub const Decoder = struct {
             0;
 
         while (dma_at != self.at) {
-            const sample = util.read_once(u16, &self.raw_timing[self.at]);
+            const sample = util.read_volatile(&self.raw_timing[self.at]);
             const diff = sample -% self.prev_sample;
             //rtt.println("{}", .{diff});
 

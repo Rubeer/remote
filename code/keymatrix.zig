@@ -121,8 +121,8 @@ fn handle_key_change(row: u8, col: u8, pressed: bool) void {
     if (pressed) {
         if (!ir.is_transmit_busy()) {
             if (row == 0 and col == 1) {
-                //ir.transmit(&ir.panasonic_volume_up);
-                hw.go_to_sleep();
+                ir.transmit(&ir.panasonic_volume_up);
+                //hw.go_to_sleep();
             }
             if (row == 1 and col == 1) {
                 ir.transmit(&ir.panasonic_volume_down);

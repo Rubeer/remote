@@ -81,10 +81,11 @@ pub const Pin = struct {
         const shift = 2 * @as(u5, self.pin);
         const mask = ~(@as(u32, 0b11) << shift);
         const bits = @as(u32, @intFromEnum(mode)) << shift;
-        var moder = get_port(self.port).MODER.read_raw();
+        const port = get_port(self.port);
+        var moder = port.MODER.read_raw();
         moder &= mask;
         moder |= bits;
-        get_port(self.port).MODER.write_raw(moder);
+        port.MODER.write_raw(moder);
     }
     pub inline fn set_low(self: Pin) void {
         get_port(self.port).BRR.write_raw((@as(u32, 1) << self.pin));

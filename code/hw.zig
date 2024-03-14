@@ -26,11 +26,11 @@ pub fn SysTick_Handler() callconv(.C) void {
 }
 
 pub fn get_ticks() u32 {
-    return util.read_once(u32, &ticks_ms);
+    return util.read_volatile(&ticks_ms);
 }
 
 pub fn init_clock() void {
-    // HSI is already enabled startup at 16 MHz.
+    // HSI is already enabled at startup, 16 MHz.
     // We don't need more than that for this application.
 
     regs.PWR.CR1.modify(.{ .VOS = 0b01 }); // Range 1 (low power)
