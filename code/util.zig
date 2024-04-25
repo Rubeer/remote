@@ -8,6 +8,15 @@ pub fn wfi() void {
 pub fn nop() void {
     asm volatile ("nop");
 }
+
+pub fn enable_interrupts() void {
+    asm volatile ("cpsie i");
+}
+
+pub fn disable_interrupts() void {
+    asm volatile ("cpsid i");
+}
+
 pub inline fn nops(count: u32) void {
     inline for (0..count) |_|
         asm volatile ("nop");

@@ -114,13 +114,14 @@ fn led_animation_update(state: *State, ticks: u32) void {
 var decoder: ir.Decoder = undefined;
 
 pub fn main() noreturn {
-    rtt.print_channel_0("Hello\n");
+    rtt.print_channel_0("Hello 123\n");
 
     keys.schedule_next_interrupt(10000);
 
     //keys.matrix[2][2].brightness = 0.1;
     keys.led_setup();
 
+    ir.sequence.init();
     ir.enable_receiver(&decoder);
 
     var state: State = .{};
@@ -128,7 +129,7 @@ pub fn main() noreturn {
     while (true) {
         const ticks = hw.get_ticks();
 
-        adc.update(ticks);
+        //adc.update(ticks);
         decoder.process();
         encoder_update(&state);
         keys.scanout_update();

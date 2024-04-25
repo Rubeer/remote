@@ -83,7 +83,7 @@ pub fn init_peripherals() void {
         .TICKINT = 1,
     });
 
-    init_vbat_measure();
+    //init_vbat_measure();
     init_encoder();
     init_ir_transmitter();
     init_ir_receiver();

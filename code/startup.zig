@@ -57,6 +57,7 @@ export const vector_table linksection(".vector_table") = svd.devices.STM32G030.V
     .DMA_Channel1 = ir.DMA_Channel1_IRQHandler,
     .DMA_Channel2_3 = ir.DMA_Channel2_3_IRQHandler,
     .TIM14 = keys.TIM14_IRQHandler,
+    .TIM16 = ir.TIM16_IRQHandler,
     .SysTick = hw.SysTick_Handler,
     .ADC_COMP = adc.ADC_COMP_IRQHandler,
 };

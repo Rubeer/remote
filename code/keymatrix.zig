@@ -120,13 +120,45 @@ fn handle_key_change(row: u8, col: u8, pressed: bool) void {
 
     if (pressed) {
         if (!ir.is_transmit_busy()) {
+            if (row == 0 and col == 0) {
+                try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_on });
+                try ir.sequence.add_entry(.{ .delay = 1000 });
+                try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_off });
+                try ir.sequence.add_entry(.{ .delay = 2000 });
+                try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_on });
+                try ir.sequence.add_entry(.{ .delay = 3000 });
+                try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_off });
+                try ir.sequence.add_entry(.{ .delay = 4000 });
+                try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_on });
+                try ir.sequence.add_entry(.{ .delay = 5000 });
+                try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_off });
+                try ir.sequence.add_entry(.{ .delay = 6000 });
+
+                //ir.transmit(&ir.power_switch_main_on);
+                //hw.go_to_sleep();
+            }
+            if (row == 1 and col == 0) {
+                //ir.transmit(&ir.power_switch_main_off);
+                //hw.go_to_sleep();
+            }
             if (row == 0 and col == 1) {
-                ir.transmit(&ir.panasonic_volume_up);
+                //ir.transmit(&ir.power_switch_secondary_on);
                 //hw.go_to_sleep();
             }
             if (row == 1 and col == 1) {
-                ir.transmit(&ir.panasonic_volume_down);
+                //ir.transmit(&ir.power_switch_secondary_off);
+                //hw.go_to_sleep();
             }
+
+            if (row == 0 and col == 2) {
+                //ir.transmit(&ir.panasonic_tv_on);
+            }
+            if (row == 1 and col == 2) {
+                //ir.transmit(&ir.panasonic_tv_off);
+            }
+            //if (row == 1 and col == 1) {
+            //ir.transmit(&ir.panasonic_volume_down);
+            //}
         }
     }
 
