@@ -12,7 +12,7 @@ pub fn build(b: *std.Build) void {
         .name = "remote.elf",
         .optimize = b.standardOptimizeOption(.{}),
         .linkage = .static,
-        .root_source_file = .{ .path = "code/startup.zig" },
+        .root_source_file = b.path("code/startup.zig"),
         .single_threaded = true,
         .target = target,
         .strip = false,
@@ -22,7 +22,7 @@ pub fn build(b: *std.Build) void {
     fw.link_function_sections = true;
     fw.link_data_sections = true;
     fw.link_gc_sections = true;
-    fw.setLinkerScriptPath(.{ .path = "linker.ld" });
+    fw.setLinkerScriptPath(b.path("linker.ld"));
 
     b.installArtifact(fw);
 }

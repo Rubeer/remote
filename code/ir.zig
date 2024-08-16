@@ -235,7 +235,7 @@ test "sequence" {
 
 pub var sequence: Sequence = undefined;
 
-pub fn start_delay(delay: u32) void {
+pub noinline fn start_delay(delay: u32) void {
     // Setup TIM16 so it triggers TIM16_IRQHandler after the delay.
     // TIM16->CNT = 0;
 
@@ -258,6 +258,15 @@ pub fn start_delay(delay: u32) void {
     //TIM16.SR.set_others_one(.{ .UIF = 0 });
     //}
     //TIM16.SR.set_others_one(.{ .UIF = 0 });
+
+    DMA.CCR1.modify(.{ .EN = 0 });
+    TIM16.DIER.modify(.{ .CC1DE = 0 }); // Disable DMA request on CC channel 1
+    TIM16.CCER.modify(.{ .CC1E = 0 }); // Disable CC channel 1
+
+    TIM16.SR.set_others_one(.{ .UIF = 0 });
+    TIM16.EGR.modify(.{ .UG = 1 });
+    while (TIM16.SR.read().UIF == 0) {}
+    TIM16.SR.set_others_one(.{ .UIF = 0 });
     TIM16.DIER.modify(.{ .UIE = 1 });
     TIM16.CR1.modify(.{ .CEN = 1 });
 }
@@ -268,13 +277,14 @@ pub fn TIM16_IRQHandler() callconv(.C) void {
         TIM16.DIER.modify(.{ .UIE = 0 });
         TIM16.SR.set_others_one(.{ .UIF = 0 });
         rtt.println("tim16", .{});
-        RCC.APBENR2.modify(.{
-            .TIM16EN = 0,
-        });
+        //RCC.APBENR2.modify(.{
+        //    .TIM16EN = 0,
+        //});
         util.write_volatile(&sequence.running, false);
         sequence.run_entry();
     } else {
-        rtt.println("tim16 spurious", .{});
+        const sr = TIM16.SR.read_raw();
+        rtt.println("tim16 spurious {x}", .{sr});
         TIM16.SR.write_raw(0); //(.{ .UIF = 0 });
     }
 }
@@ -306,11 +316,13 @@ pub fn transmit(cmd: *const IRCommand) void {
     TIM17.ARR.write_raw(carrier_period - 1);
     TIM17.CNT.write_raw(0);
     TIM17.CCER.modify(.{ .CC1E = 1 }); // Enable CC channel 1
+    TIM17.EGR.modify(.{ .UG = 1 });
 
     TIM16.PSC.write_raw(0);
     TIM16.ARR.write_raw(cmd.timings[0]);
     TIM16.CNT.write_raw(0);
     TIM16.CCER.modify(.{ .CC1E = 1 }); // Enable CC channel 1
+    TIM16.EGR.modify(.{ .UG = 1 });
 
     // Force the output level to begin at inactive level
     // (It may be in another state due to previous toggles)

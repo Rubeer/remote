@@ -115,24 +115,40 @@ pub fn led_setup() void {
     util.enable_irqs(&.{.TIM14});
 }
 
+const TV = struct {
+    power: bool,
+    muted: bool,
+    channel: u32,
+};
+
+const AMP = struct {
+    power: bool,
+    muted: bool,
+    channel: u32,
+};
+
+fn chromecast_power_on() void {
+    try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_on });
+    try ir.sequence.add_entry(.{ .delay = 1000 });
+    try ir.sequence.add_entry(.{ .ir_command = &ir.panasonic_tv_on });
+    try ir.sequence.add_entry(.{ .delay = 100 });
+    try ir.sequence.add_entry(.{ .ir_command = &ir.nad_amp_on });
+    try ir.sequence.add_entry(.{ .delay = 100 });
+    try ir.sequence.add_entry(.{ .ir_command = &ir.nad_amp_input_video2 });
+
+    try ir.sequence.add_entry(.{ .delay = 1000 });
+
+    try ir.sequence.add_entry(.{ .ir_command = &ir.panasonic_hdmi1 });
+    try ir.sequence.add_entry(.{ .ir_command = &ir.nad_amp_mute_toggle });
+}
+
 fn handle_key_change(row: u8, col: u8, pressed: bool) void {
     matrix[row][col].input_state = pressed;
 
     if (pressed) {
         if (!ir.is_transmit_busy()) {
             if (row == 0 and col == 0) {
-                try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_on });
-                try ir.sequence.add_entry(.{ .delay = 1000 });
-                try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_off });
-                try ir.sequence.add_entry(.{ .delay = 2000 });
-                try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_on });
-                try ir.sequence.add_entry(.{ .delay = 3000 });
-                try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_off });
-                try ir.sequence.add_entry(.{ .delay = 4000 });
-                try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_on });
-                try ir.sequence.add_entry(.{ .delay = 5000 });
-                try ir.sequence.add_entry(.{ .ir_command = &ir.power_switch_main_off });
-                try ir.sequence.add_entry(.{ .delay = 6000 });
+                chromecast_power_on();
 
                 //ir.transmit(&ir.power_switch_main_on);
                 //hw.go_to_sleep();
